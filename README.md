@@ -1,1 +1,1 @@
-# pick a name
+# pick a name for the project
