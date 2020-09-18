@@ -1,1 +1,1 @@
-# pick a name for the project
+# Class 12 Computer Science Project
