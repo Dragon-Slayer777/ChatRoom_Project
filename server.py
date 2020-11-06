@@ -2,104 +2,64 @@
 #This is a project that integrates threading,sockets and tkinter
 #This consists of 2 parts the server and client
 #A GUI interface is setup on client side of application
-# import socket library 
-import socket 
+from socket import AF_INET, socket, SOCK_STREAM
+from threading import Thread
 
-# import threading library 
-import threading 
 
-# Choose a port that is free 
-PORT = 5000
+def accept_incoming_connections():
+    """Sets up handling for incoming clients."""
+    while True:
+        client, client_address = SERVER.accept()
+        print("%s:%s has connected." % client_address)
+        client.send(bytes("Greetings from DY CHAT! Now type your name and press enter!", "utf8"))
+        addresses[client] = client_address
+        Thread(target=handle_client, args=(client,)).start()
 
-# An IPv4 address is obtained 
-# for the server. 
-SERVER = socket.gethostbyname(socket.gethostname()) 
 
-# Address is stored as a tuple 
-ADDRESS = (SERVER, PORT) 
+def handle_client(client):  # Takes client socket as argument.
+    """Handles a single client connection."""
 
-# the format in which encoding 
-# and decoding will occur 
-FORMAT = "utf-8"
+    name = client.recv(BUFSIZ).decode("utf8")
+    welcome = 'Hi %s! If you wish to leave, type {quit} to exit.' % name
+    client.send(bytes(welcome, "utf8"))
+    msg = "%s has joined the chat!" % name
+    broadcast(bytes(msg, "utf8"))
+    clients[client] = name
 
-# Lists that will contains 
-# all the clients connected to 
-# the server and their names. 
-clients, names = [], [] 
+    while True:
+        msg = client.recv(BUFSIZ)
+        if msg != bytes("{quit}", "utf8"):
+            broadcast(msg, name+": ")
+        else:
+            client.send(bytes("{quit}", "utf8"))
+            client.close()
+            del clients[client]
+            broadcast(bytes("%s has left the chat." % name, "utf8"))
+            break
 
-# Create a new socket for 
-# the server 
-server = socket.socket(socket.AF_INET, 
-					socket.SOCK_STREAM) 
 
-# bind the address of the 
-# server to the socket 
-server.bind(ADDRESS) 
+def broadcast(msg, prefix=""):  # prefix is for name identification.
+    """Broadcasts a message to all the clients."""
 
-# function to start the connection 
-def startChat(): 
-	
-	print("server is working on " + SERVER) 
-	
-	# listening for connections 
-	server.listen() 
-	
-	while True: 
-		
-		# accept connections and returns 
-		# a new connection to the client 
-		# and the address bound to it 
-		conn, addr = server.accept() 
-		conn.send("NAME".encode(FORMAT)) 
-		
-		# 1024 represents the max amount 
-		# of data that can be received (bytes) 
-		name = conn.recv(1024).decode(FORMAT) 
-		
-		# append the name and client 
-		# to the respective list 
-		names.append(name) 
-		clients.append(conn) 
-		
-		print(f"Name is :{name}") 
-		
-		# broadcast message 
-		broadcastMessage(f"{name} has joined the chat!".encode(FORMAT)) 
-		
-		conn.send('Connection successful!'.encode(FORMAT)) 
-		
-		# Start the handling thread 
-		thread = threading.Thread(target = handle, 
-								args = (conn, addr)) 
-		thread.start() 
-		
-		# no. of clients connected 
-		# to the server 
-		print(f"active connections {threading.activeCount()-1}") 
+    for sock in clients:
+        sock.send(bytes(prefix, "utf8")+msg)
 
-# method to handle the 
-# incoming messages 
-def handle(conn, addr): 
-	
-	print(f"new connection {addr}") 
-	connected = True
-	
-	while connected: 
-		# recieve message 
-		message = conn.recv(1024) 
-		
-		# broadcast message 
-		broadcastMessage(message) 
-	
-	# close the connection 
-	conn.close() 
+        
+clients = {}
+addresses = {}
 
-# method for broadcasting 
-# messages to the each clients 
-def broadcastMessage(message): 
-	for client in clients: 
-		client.send(message) 
+HOST = ''
+PORT = 33000
+BUFSIZ = 1024
+ADDR = (HOST, PORT)
 
-# call the method to 
-# begin the communication 
-startChat() 
+SERVER = socket(AF_INET, SOCK_STREAM)
+SERVER.bind(ADDR)
+
+if __name__ == "__main__":
+    SERVER.listen(5)
+    print("Waiting for connection...")
+    ACCEPT_THREAD = Thread(target=accept_incoming_connections)
+    ACCEPT_THREAD.start()
+    ACCEPT_THREAD.join()
+    SERVER.close()    
